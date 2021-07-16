@@ -97,7 +97,6 @@ public class WebAccessControlManager {
 		
 		// TODO: we should filter out every rule which does not comply with
 		// https://solid.github.io/web-access-control-spec/#authorization-conformance
-		
 		while(iter.hasNext()) {
 			Resource authRule = iter.nextResource();
 			
@@ -135,7 +134,7 @@ public class WebAccessControlManager {
 		}
 
 		
-		return true;
+		return false;
 	}
 
 	/**
