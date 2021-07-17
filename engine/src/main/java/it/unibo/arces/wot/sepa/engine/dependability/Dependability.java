@@ -61,7 +61,7 @@ public class Dependability {
 		isSecure = true;
 	}
 
-	public static void enableKeyCloakSecurity(SSLContext ssl, RSAKey key,LdapProperties prop, IsqlProperties isqlprop) throws SEPASecurityException {
+	public static void enableKeycloakSecurity(SSLContext ssl, RSAKey key,LdapProperties prop, IsqlProperties isqlprop) throws SEPASecurityException {
 		authManager = new  KeyCloakSecurityManager( ssl,  key, prop, isqlprop);
 		isSecure = true;
 	}

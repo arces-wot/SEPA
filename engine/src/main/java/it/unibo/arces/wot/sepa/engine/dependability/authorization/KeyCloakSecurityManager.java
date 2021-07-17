@@ -41,12 +41,12 @@ public class KeyCloakSecurityManager extends SecurityManager {
 	
 	@Override
 	public synchronized Response register(String uid) {
-		return new ErrorResponse(HttpStatus.SC_UNAUTHORIZED, "not supported", "Implemented by KeyCloak");
+		return new ErrorResponse(HttpStatus.SC_UNAUTHORIZED, "not supported", "Implemented by Keycloak");
 	}
 	
 	@Override
 	public synchronized Response getToken(String encodedCredentials) {
-		return new ErrorResponse(HttpStatus.SC_UNAUTHORIZED, "not supported", "Implemented by KeyCloak");
+		return new ErrorResponse(HttpStatus.SC_UNAUTHORIZED, "not supported", "Implemented by Keycloak");
 	}
 
 	/** Requesting Party Token 
