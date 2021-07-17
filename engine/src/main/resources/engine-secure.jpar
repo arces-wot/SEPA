@@ -29,7 +29,8 @@
 				"subscribe": "/subscribe",
 				"register": "/oauth/register",
 				"tokenRequest": "/oauth/token",
-				"securePath": "/secure"
+				"securePath": "/secure",
+				"wacPath": "/wac"
 			}
 		}
 	}
