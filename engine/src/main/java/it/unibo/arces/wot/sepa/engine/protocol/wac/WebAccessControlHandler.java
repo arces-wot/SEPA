@@ -1,33 +1,17 @@
 package it.unibo.arces.wot.sepa.engine.protocol.wac;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.security.interfaces.RSAPublicKey;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.concurrent.TimeUnit;
 
-import org.apache.http.ExceptionLogger;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.BasicHttpEntity;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.nio.bootstrap.HttpServer;
-import org.apache.http.impl.nio.bootstrap.ServerBootstrap;
 import org.apache.http.nio.protocol.BasicAsyncRequestConsumer;
-import org.apache.http.nio.protocol.BasicAsyncResponseProducer;
 import org.apache.http.nio.protocol.HttpAsyncExchange;
 import org.apache.http.nio.protocol.HttpAsyncRequestConsumer;
 import org.apache.http.nio.protocol.HttpAsyncRequestHandler;
@@ -38,42 +22,14 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonParser;
-import com.nimbusds.jose.JOSEException;
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.crypto.RSASSAVerifier;
-import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
-import com.nimbusds.jose.jwk.source.JWKSource;
-import com.nimbusds.jose.proc.JWSKeySelector;
-import com.nimbusds.jose.proc.JWSVerificationKeySelector;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
-import com.nimbusds.jwt.proc.DefaultJWTProcessor;
-import com.sun.tools.javac.util.Pair;
 
-import it.unibo.arces.wot.sepa.commons.exceptions.SEPAProtocolException;
-import it.unibo.arces.wot.sepa.commons.exceptions.SEPASecurityException;
 import it.unibo.arces.wot.sepa.commons.response.ErrorResponse;
-import it.unibo.arces.wot.sepa.commons.response.Response;
-import it.unibo.arces.wot.sepa.commons.security.ClientAuthorization;
-import it.unibo.arces.wot.sepa.commons.security.Credentials;
-import it.unibo.arces.wot.sepa.engine.bean.EngineBeans;
 import it.unibo.arces.wot.sepa.engine.bean.HTTPHandlerBeans;
 import it.unibo.arces.wot.sepa.engine.bean.SEPABeans;
-import it.unibo.arces.wot.sepa.engine.core.EngineProperties;
 import it.unibo.arces.wot.sepa.engine.dependability.Dependability;
-import it.unibo.arces.wot.sepa.engine.dependability.authorization.SEPASecurityContext;
 import it.unibo.arces.wot.sepa.engine.dependability.authorization.wac.PermissionsBean;
 import it.unibo.arces.wot.sepa.engine.dependability.authorization.wac.WebAccessControlManager;
-import it.unibo.arces.wot.sepa.engine.gates.http.EchoHandler;
 import it.unibo.arces.wot.sepa.engine.gates.http.HttpUtilities;
-import it.unibo.arces.wot.sepa.engine.protocol.sparql11.SPARQL11ProtocolException;
-import it.unibo.arces.wot.sepa.engine.protocol.sparql11.SPARQL11ResponseHandler;
-import it.unibo.arces.wot.sepa.engine.scheduling.InternalUQRequest;
-import it.unibo.arces.wot.sepa.engine.scheduling.ScheduledRequest;
-import it.unibo.arces.wot.sepa.engine.scheduling.Scheduler;
-import it.unibo.arces.wot.sepa.engine.timing.Timings;
 
 public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequest>, WebAccessControlHandlerMBean {
 	protected static final Logger logger = LogManager.getLogger();
@@ -108,95 +64,7 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 		return true;
 	}
 	
-	protected String validateAccessToken(String accessToken) throws WacProtocolException {
-		logger.log(Level.getLevel("oauth"),"VALIDATE TOKEN");
-
-		// Parse token
-		SignedJWT signedJWT = null;
-		try {
-			signedJWT = SignedJWT.parse(accessToken);
-		} catch (ParseException e) {
-			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Access token parsing error: " + e.getMessage());
-		}
-
-		// Verify token
-		// TODO: dobbiamo ottenere la chiave pubblica (jwk) dell'IdentityProvider
-		// in maniera dinamica secondo il protocollo OIDC.
-		/*
-		 * Lines below were copied from SecurityManager.setupValidation():
-		 */
-		// Get the  public key to verify
-		RSAPublicKey publicKey = jwk.toRSAPublicKey();
-
-		// Create RSA-verifier with the public key
-		RSASSAVerifier verifier = new RSASSAVerifier(publicKey);
-
-		//#####################################################################
-		
-		try {
-			if (!signedJWT.verify(verifier)) {
-				logger.error("Signed JWT not verified");
-				return new ClientAuthorization("invalid_grant", "Signed JWT not verified");
-			}
-
-		} catch (JOSEException e) {
-			logger.error(e.getMessage());
-			return new ClientAuthorization("invalid_grant", "JOSEException: " + e.getMessage());
-		}
-		
-
-		String webid;
-		// Process token (validate)
-		JWTClaimsSet claimsSet = null;
-		try {
-			claimsSet = signedJWT.getJWTClaimsSet();
-			logger.log(Level.getLevel("oauth"),claimsSet);
-			// Get client credentials for accessing the SPARQL endpoint
-			webid = claimsSet.getStringClaim("webid");
-			if (webid == null) {
-				logger.log(Level.getLevel("oauth"),"<webid> claim is null. WebID-OIDC protocol violated");
-				return new ClientAuthorization("invalid_grant", "Username claim not found");
-			}
-			
-			logger.log(Level.getLevel("oauth"),"Subject: "+claimsSet.getSubject());
-			logger.log(Level.getLevel("oauth"),"Issuer: "+claimsSet.getIssuer());
-			logger.log(Level.getLevel("oauth"),"WebId: "+webid);
-		} catch (ParseException e) {
-			logger.error(e.getMessage());
-			return new ClientAuthorization("invalid_grant", "ParseException. " + e.getMessage());
-		}
-
-
-		// Check token expiration (an "invalid_grant" error is raised if the token is
-		// expired)
-		Date now = new Date();
-		long nowUnixSeconds = (now.getTime() / 1000) * 1000;
-		Date expiring = claimsSet.getExpirationTime();
-		Date notBefore = claimsSet.getNotBeforeTime();
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS");
-		if (expiring.getTime() - nowUnixSeconds < 0) {
-			logger.warn("Token is expired: " + sdf.format(claimsSet.getExpirationTime()) + " < "
-					+ sdf.format(new Date(nowUnixSeconds)));
-
-			return new ClientAuthorization("invalid_grant", "Token issued at " + sdf.format(claimsSet.getIssueTime())
-					+ " is expired: " + sdf.format(claimsSet.getExpirationTime()) + " < " + sdf.format(now));
-		}
-
-		if (notBefore != null && nowUnixSeconds < notBefore.getTime()) {
-			logger.warn("Token can not be used before: " + claimsSet.getNotBeforeTime());
-			return new ClientAuthorization("invalid_grant",
-					"Token can not be used before: " + claimsSet.getNotBeforeTime());
-		}
-		
-		return webid;
-	}
-	
-	
 	protected WacRequest parse(HttpAsyncExchange httpExchange) {
-		// Values to be returned
-		String webid = "";
-		String resIdentifier = "";
-		
 		HttpRequest request = httpExchange.getRequest();
 		String requestUri = request.getRequestLine().getUri();
 		
@@ -214,7 +82,7 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 		
 		Header[] headers;
 		// Parsing and validating request headers
-		// Content-Type: text/plain
+		// Content-Type: application/json
 		// Accept: application/json
 		
 		// Content-Type header
@@ -225,8 +93,8 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 		if (headers.length > 1) {
 			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Too many Content-Type headers");
 		}
-		if (!headers[0].getValue().equals("text/plain")) {
-			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Content-Type must be: text/plain");
+		if (!headers[0].getValue().equals("application/json")) {
+			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Content-Type must be: application/json");
 		}
 
 		// Accept header
@@ -241,51 +109,42 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Content-Type must be: application/json");
 		}
 
-		// Authorization header
-		headers = request.getHeaders("Authorization");
-		if (headers.length == 0) {
-			webid = null;
-		} else if (headers.length > 1) {
-			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Too many Authorization headers");
-		} else {
-			// Extract Bearer64 authorization
-			String bearer = headers[0].getValue();
-	
-			if (!bearer.startsWith("Bearer ")) {
-				throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Authorization must be \"Bearer Base64(OIDC identity token)\"");
-			}
-			
-			String base64Token = bearer.split(" ")[1];
-			try {
-				webid = this.validateAccessToken(base64Token);
-			} catch(WacProtocolException e) {
-				throw e;
-			}
-		}
 		
 		String requestMethod = request.getRequestLine().getMethod();
 		if (!requestMethod.toUpperCase().equals("POST")) {
 			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "The only method allowed is POST");
 		}
 		
+		String requestBody;
 		HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
 		try {
-			resIdentifier = EntityUtils.toString(entity, Charset.forName("UTF-8"));
+			requestBody = EntityUtils.toString(entity, Charset.forName("UTF-8"));
 		} catch (org.apache.http.ParseException | IOException e) {
 			logger.error(e);
 			throw new WacProtocolException(HttpStatus.SC_INTERNAL_SERVER_ERROR, "Error while parsing the request body");
 		}
 		
+		Gson gson = new Gson();
+		WacRequest wacRequest = (WacRequest) gson.fromJson(requestBody, WacRequest.class);
+		
 		// Resource identifier URI syntactical validation
 		try {
-			new URI(resIdentifier);
+			new URI(wacRequest.getResIdentifier());
 		} catch (URISyntaxException e) {
 			logger.error(e);
 			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Resource identifier should be a valid URI.");
 		}
 		
+		// WebId URI syntactical validation
+		try {
+			new URI(wacRequest.getWebid());
+		} catch (URISyntaxException e) {
+			logger.error(e);
+			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "WebId should be a valid URI.");
+		}
+		
 		// Return the final result
-		return new WacRequest(webid, resIdentifier);
+		return wacRequest;
 	}
 	
 	@Override
@@ -373,38 +232,6 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 	@Override
 	public long getErrors_ParsingFailed() {
 		return jmx.getErrors_ParsingFailed();
-	}
-
-	private class WacRequest {
-		private String webid;
-		private String resIdentifier;
-		
-		public WacRequest() {
-			this.webid = "";
-			this.resIdentifier = "";
-		}
-		
-		public WacRequest(String webid, String resIdentifier) {
-			this.webid = webid;
-			this.resIdentifier = resIdentifier;
-		}
-		
-		public String getWebid() {
-			return webid;
-		}
-		
-		public void setWebid(String webid) {
-			this.webid = webid;
-		}
-		
-		public String getResIdentifier() {
-			return resIdentifier;
-		}
-		
-		public void setResIdentifier(String resIdentifier) {
-			this.resIdentifier = resIdentifier;
-		}
-		
 	}
 
 }
