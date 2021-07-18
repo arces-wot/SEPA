@@ -32,8 +32,8 @@ import org.apache.logging.log4j.Logger;
 import it.unibo.arces.wot.sepa.commons.exceptions.SEPAProtocolException;
 import it.unibo.arces.wot.sepa.engine.bean.EngineBeans;
 import it.unibo.arces.wot.sepa.engine.core.EngineProperties;
-
 import it.unibo.arces.wot.sepa.engine.protocol.sparql11.SPARQL11Handler;
+import it.unibo.arces.wot.sepa.engine.protocol.wac.WebAccessControlHandler;
 import it.unibo.arces.wot.sepa.engine.scheduling.Scheduler;
 
 public class HttpGate {
@@ -52,11 +52,13 @@ public class HttpGate {
 		this.scheduler = scheduler;
 		
 		SPARQL11Handler handler = new SPARQL11Handler(scheduler,properties.getQueryPath(),properties.getUpdatePath());
-	
+		WebAccessControlHandler wacHandler = new WebAccessControlHandler(properties.getWacPath());
+		
 		server = ServerBootstrap.bootstrap().setListenerPort(properties.getHttpPort())
 				.setServerInfo(serverInfo).setIOReactorConfig(config).setExceptionLogger(ExceptionLogger.STD_ERR)
 				.registerHandler(properties.getQueryPath(), handler)
 				.registerHandler(properties.getUpdatePath(), handler)
+				.registerHandler(properties.getWacPath(), wacHandler)
 				.registerHandler("/echo", new EchoHandler()).create();
 		
 		try {
