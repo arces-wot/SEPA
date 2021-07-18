@@ -48,7 +48,7 @@ public class WebAccessControlManager {
 	 */
 	public PermissionsBean handle(String identifiers, String credentials) {
 		Model acl = this.getAclRecursive(identifiers, false);
-		PermissionsBean allowedModes = this.createAuthorization(credentials, acl);
+		PermissionsBean allowedModes = this.createAuthorization(credentials, acl, identifiers);
 		return allowedModes;
 	}
 
@@ -74,10 +74,10 @@ public class WebAccessControlManager {
 	 * @param credentials credential of the agent requesting the resource
 	 * @param acl         triples relevant for authorization
 	 */
-	private PermissionsBean createAuthorization(String credentials, Model acl) {
+	private PermissionsBean createAuthorization(String credentials, Model acl, String resIdentifier) {
 		PermissionsBean permissions = new PermissionsBean(false, false, false, false);
 
-		List<Resource> ruleList = this.filterRules(acl, credentials);
+		List<Resource> ruleList = this.filterRules(acl, credentials, resIdentifier);
 
 		String ACL = "http://www.w3.org/ns/auth/acl#";
 
@@ -100,7 +100,7 @@ public class WebAccessControlManager {
 		return permissions;
 	}
 
-	private List<Resource> filterRules(Model acl, String credentials) {
+	private List<Resource> filterRules(Model acl, String credentials, String resIdentifier) {
 		List<Resource> filteredRes = new ArrayList<>();
 
 		Resource res = acl.getResource("http://www.w3.org/ns/auth/acl#Authorization");
@@ -112,7 +112,7 @@ public class WebAccessControlManager {
 		while (iter.hasNext()) {
 			Resource authRule = iter.nextResource();
 
-			if (this.applyFilters(credentials, acl, authRule)) {
+			if (this.applyFilters(credentials, acl, authRule, resIdentifier)) {
 				filteredRes.add(authRule);
 			}
 		}
@@ -120,12 +120,18 @@ public class WebAccessControlManager {
 		return filteredRes;
 	}
 
-	private boolean applyFilters(String credentials, Model acl, Resource authRule) {
+	private boolean applyFilters(String credentials, Model acl, Resource authRule, String resIdentifier) {
 		String ACL = "http://www.w3.org/ns/auth/acl#";
 		Property aclAgent = acl.createProperty(ACL + "agent");
 		Property aclAgentClass = acl.createProperty(ACL + "agentClass");
+		Property aclAccessTo = acl.createProperty(ACL + "accessTo");
 		Resource aclAuthenticatedAgent = acl.createResource(ACL + "AuthenticatedAgent");
+		Resource resourceURI = acl.createResource(resIdentifier);
 
+		if (!acl.contains(authRule, aclAccessTo, resourceURI)) {
+			return false;
+		}
+		
 		if (acl.contains(authRule, aclAgentClass, FOAF.Agent)) {
 			return true;
 		}
