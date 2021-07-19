@@ -4,32 +4,26 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.http.HttpException;
-import org.apache.http.HttpRequest;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.nio.protocol.HttpAsyncExchange;
-import org.apache.http.nio.protocol.HttpAsyncRequestConsumer;
-import org.apache.http.nio.protocol.HttpAsyncRequestHandler;
-import org.apache.http.protocol.HttpContext;
-import org.apache.jena.sparql.lang.SPARQLParser;
 import org.apache.jena.sparql.vocabulary.FOAF;
 import org.apache.jena.vocabulary.RDF;
-import org.apache.jena.vocabulary.VCARD;
 
-import com.google.gson.JsonObject;
-import com.nimbusds.jwt.SignedJWT;
+import it.unibo.arces.wot.sepa.commons.exceptions.SEPASecurityException;
+import it.unibo.arces.wot.sepa.commons.protocol.SPARQL11Properties.QueryHTTPMethod;
+import it.unibo.arces.wot.sepa.commons.protocol.SPARQL11Protocol;
+import it.unibo.arces.wot.sepa.commons.request.QueryRequest;
+import it.unibo.arces.wot.sepa.commons.response.QueryResponse;
+import it.unibo.arces.wot.sepa.commons.sparql.Bindings;
 
-import it.unibo.arces.wot.sepa.engine.scheduling.JenaSparqlParsing;
-
-import org.apache.jena.graph.Graph;
-import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.NodeIterator;
 import org.apache.jena.rdf.model.Property;
 import org.apache.jena.rdf.model.RDFNode;
 import org.apache.jena.rdf.model.ResIterator;
 import org.apache.jena.rdf.model.Resource;
+import org.apache.jena.rdf.model.Selector;
+import org.apache.jena.rdf.model.SimpleSelector;
+import org.apache.jena.rdf.model.Statement;
+import org.apache.jena.rdf.model.StmtIterator;
 
 public class WebAccessControlManager {
 	// TODO: implement WAC
@@ -48,7 +42,7 @@ public class WebAccessControlManager {
 	 */
 	public PermissionsBean handle(String identifiers, String credentials) {
 		Model acl = this.getAclRecursive(identifiers, false);
-		PermissionsBean allowedModes = this.createAuthorization(credentials, acl, identifiers);
+		PermissionsBean allowedModes = this.createAuthorization(credentials, acl);
 		return allowedModes;
 	}
 
@@ -74,10 +68,10 @@ public class WebAccessControlManager {
 	 * @param credentials credential of the agent requesting the resource
 	 * @param acl         triples relevant for authorization
 	 */
-	private PermissionsBean createAuthorization(String credentials, Model acl, String resIdentifier) {
+	private PermissionsBean createAuthorization(String credentials, Model acl) {
 		PermissionsBean permissions = new PermissionsBean(false, false, false, false);
 
-		List<Resource> ruleList = this.filterRules(acl, credentials, resIdentifier);
+		List<Resource> ruleList = this.filterRules(acl, credentials);
 
 		String ACL = "http://www.w3.org/ns/auth/acl#";
 
@@ -88,7 +82,7 @@ public class WebAccessControlManager {
 		if (this.hasPermission(acl, ACL + "Write", credentials, ruleList)) {
 			permissions.setWrite(true);
 		}
-		
+
 		if (this.hasPermission(acl, ACL + "Append", credentials, ruleList)) {
 			permissions.setAppend(true);
 		}
@@ -100,7 +94,7 @@ public class WebAccessControlManager {
 		return permissions;
 	}
 
-	private List<Resource> filterRules(Model acl, String credentials, String resIdentifier) {
+	private List<Resource> filterRules(Model acl, String credentials) {
 		List<Resource> filteredRes = new ArrayList<>();
 
 		Resource res = acl.getResource("http://www.w3.org/ns/auth/acl#Authorization");
@@ -112,7 +106,7 @@ public class WebAccessControlManager {
 		while (iter.hasNext()) {
 			Resource authRule = iter.nextResource();
 
-			if (this.applyFilters(credentials, acl, authRule, resIdentifier)) {
+			if (this.applyFilters(credentials, acl, authRule)) {
 				filteredRes.add(authRule);
 			}
 		}
@@ -120,18 +114,12 @@ public class WebAccessControlManager {
 		return filteredRes;
 	}
 
-	private boolean applyFilters(String credentials, Model acl, Resource authRule, String resIdentifier) {
+	private boolean applyFilters(String credentials, Model acl, Resource authRule) {
 		String ACL = "http://www.w3.org/ns/auth/acl#";
 		Property aclAgent = acl.createProperty(ACL + "agent");
 		Property aclAgentClass = acl.createProperty(ACL + "agentClass");
-		Property aclAccessTo = acl.createProperty(ACL + "accessTo");
 		Resource aclAuthenticatedAgent = acl.createResource(ACL + "AuthenticatedAgent");
-		Resource resourceURI = acl.createResource(resIdentifier);
 
-		if (!acl.contains(authRule, aclAccessTo, resourceURI)) {
-			return false;
-		}
-		
 		if (acl.contains(authRule, aclAgentClass, FOAF.Agent)) {
 			return true;
 		}
@@ -150,7 +138,7 @@ public class WebAccessControlManager {
 
 			// TODO: handle groups!
 		}
-		
+
 		return false;
 	}
 
@@ -175,6 +163,48 @@ public class WebAccessControlManager {
 		return false;
 	}
 
+	private String getAuxiliaryIdentifier(String resIdentifier) {
+		return resIdentifier + ".acl";
+	}
+
+	private boolean isRootContainer(String resIdentifier) {
+		return resIdentifier.equals("http://localhost:3000/");
+	}
+
+	private String getParentContainer(String id) {
+		return id.substring(0, id.lastIndexOf("/"));
+	}
+
+	private Model getResourceFromTriplestore(String resIdentifier) throws SEPASecurityException, IOException {
+//		request = new QueryRequest(properties.getQueryMethod(), properties.getProtocolScheme(),
+//				properties.getHost(), properties.getPort(), properties.getQueryPath(),
+//				req.getSparql(), req.getDefaultGraphUri(), req.getNamedGraphUri(),
+//				req.getBasicAuthorizationHeader(),req.getInternetMediaType(),QueryProcessorBeans.getTimeout(),0);
+		
+		QueryRequest request = new QueryRequest(QueryHTTPMethod.GET,
+				"http", "localhost", 9999, "/blazegraph/sparql",
+				"SELECT {?s ?p ?o} WHERE { GRAPH <" + resIdentifier + "> {?s ?p ?o}}",
+				null, null,	"JSON", 5000, 0);
+
+		SPARQL11Protocol endpoint = new SPARQL11Protocol();
+		QueryResponse ret = (QueryResponse) endpoint.query(request);
+		endpoint.close();
+		
+		Model data = ModelFactory.createDefaultModel();
+		List<Statement> stmts = new ArrayList<>();
+		
+		for (Bindings b : ret.getBindingsResults().getBindings()) {
+			Resource s = data.createResource(b.getValue("s"));
+			Property p = data.createProperty(b.getValue("p"));
+			Resource o = data.createResource(b.getValue("o"));
+			
+			stmts.add(data.createStatement(s, p, o));
+		}
+		
+		data.add(stmts);
+		
+		return data;
+	}
 	/**
 	 * Returns the ACL triples that are relevant for the given identifier. These can
 	 * either be from a corresponding ACL document or an ACL document higher up with
@@ -184,6 +214,41 @@ public class WebAccessControlManager {
 	 * @param recurse Only used internally for recursion.
 	 */
 	private Model getAclRecursive(String id, boolean recurse) {
+//		String ACL = "http://www.w3.org/ns/auth/acl#";
+//		// String FOAF = "http://xmlns.com/foaf/0.1/";
+//		String aclPrefix = "http://localhost:3000/resource.ttl.acl";
+//
+//		Model model = ModelFactory.createDefaultModel();
+//
+//		Resource aclAuthorization = model.createResource(ACL + "Authorization");
+//		Resource aclRead = model.createResource(ACL + "Read");
+//		Resource aclWrite = model.createResource(ACL + "Write");
+//		Resource aclAppend = model.createResource(ACL + "Append");
+//		Resource aclControl = model.createResource(ACL + "Control");
+//		Property aclAgent = model.createProperty(ACL + "agent");
+//		Property aclAgentClass = model.createProperty(ACL + "agentClass");
+//		Property aclAgentGroup = model.createProperty(ACL + "agentGroup");
+//		Property aclAccessTo = model.createProperty(ACL + "accessTo");
+//		Property aclMode = model.createProperty(ACL + "mode");
+//
+//		Resource userTestAgent = model.createResource("http://localhost:3000/user_test#me");
+//		Resource testGroup = model.createResource("http://localhost:3000/test_group#test");
+//		Resource resource = model.createResource("http://localhost:3000/resource.ttl");
+//
+//		model.createResource(aclPrefix + "#auth1").addProperty(RDF.type, aclAuthorization)
+//				.addProperty(aclAgent, userTestAgent).addProperty(aclMode, aclRead).addProperty(aclMode, aclWrite)
+//				.addProperty(aclMode, aclAppend).addProperty(aclMode, aclControl).addProperty(aclAccessTo, resource);
+//
+//		model.createResource(aclPrefix + "#auth2").addProperty(RDF.type, aclAuthorization)
+//				.addProperty(aclAgentGroup, testGroup).addProperty(aclMode, aclRead).addProperty(aclMode, aclWrite)
+//				.addProperty(aclAccessTo, resource);
+//
+//		model.createResource(aclPrefix + "#auth3").addProperty(RDF.type, aclAuthorization)
+//				.addProperty(aclAgentClass, FOAF.Agent).addProperty(aclMode, aclRead)
+//				.addProperty(aclAccessTo, resource);
+//
+//		return model;
+
 		/*
 		 * 1. Use the document's own ACL resource if it exists (in which case, stop
 		 * here). 2. Otherwise, look for authorizations to inherit from the ACL of the
@@ -195,41 +260,53 @@ public class WebAccessControlManager {
 		 * account MUST have an ACL resource specified. (If all else fails, the search
 		 * stops there.)
 		 */
-		// some definitions
+
+		// Obtain the direct ACL document for the resource, if it exists
+		String aclIdentifier;
+		try {
+			aclIdentifier = this.getAuxiliaryIdentifier(id);
+			Model data = this.getResourceFromTriplestore(aclIdentifier);
+			return this.filterData(data, recurse, aclIdentifier);
+		} catch (RuntimeException | SEPASecurityException | IOException e) {
+			e.printStackTrace();
+		}
+
+		// Obtain the applicable ACL of the parent container
+		if (this.isRootContainer(id)) {
+			// Solid, §10.1: "In the event that a server can’t apply an ACL to a resource,
+			// it MUST deny access."
+			// https://solid.github.io/specification/protocol#web-access-control
+			throw new RuntimeException("ACL file not found");
+		}
+		String parent = this.getParentContainer(id);
+		return this.getAclRecursive(parent, true);
+	}
+
+	private Model filterData(Model data, boolean recurse, String object) {
 		String ACL = "http://www.w3.org/ns/auth/acl#";
-		// String FOAF = "http://xmlns.com/foaf/0.1/";
-		String aclPrefix = "http://localhost:3000/resource.ttl.acl";
 
-		Model model = ModelFactory.createDefaultModel();
+		Model filteredData = ModelFactory.createDefaultModel();
 
-		Resource aclAuthorization = model.createResource(ACL + "Authorization");
-		Resource aclRead = model.createResource(ACL + "Read");
-		Resource aclWrite = model.createResource(ACL + "Write");
-		Resource aclAppend = model.createResource(ACL + "Append");
-		Resource aclControl = model.createResource(ACL + "Control");
-		Property aclAgent = model.createProperty(ACL + "agent");
-		Property aclAgentClass = model.createProperty(ACL + "agentClass");
-		Property aclAgentGroup = model.createProperty(ACL + "agentGroup");
-		Property aclAccessTo = model.createProperty(ACL + "accessTo");
-		Property aclMode = model.createProperty(ACL + "mode");
+		Resource aclIdentifier = filteredData.getResource(object);
+		Property predicate;
+		if (recurse) {
+			predicate = filteredData.getProperty(ACL + "default");
+		} else {
+			predicate = filteredData.getProperty(ACL + "accessTo");
+		}
 
-		Resource userTestAgent = model.createResource("http://localhost:3000/user_test#me");
-		Resource testGroup = model.createResource("http://localhost:3000/test_group#test");
-		Resource resource = model.createResource("http://localhost:3000/resource.ttl");
+		ResIterator iter = data.listResourcesWithProperty(predicate, aclIdentifier);
+		while (iter.hasNext()) {
+			Resource rule = iter.next();
+			
+			Selector stmtSelector = new SimpleSelector(rule, (Property) null, (RDFNode) null);
+			StmtIterator ruleStatements = data.listStatements(stmtSelector);
+			while (ruleStatements.hasNext()) {
+				filteredData.add(ruleStatements.next());
+			}
+		}
 
-		model.createResource(aclPrefix + "#auth1").addProperty(RDF.type, aclAuthorization)
-				.addProperty(aclAgent, userTestAgent).addProperty(aclMode, aclRead).addProperty(aclMode, aclWrite)
-				.addProperty(aclMode, aclAppend).addProperty(aclMode, aclControl).addProperty(aclAccessTo, resource);
-
-		model.createResource(aclPrefix + "#auth2").addProperty(RDF.type, aclAuthorization)
-				.addProperty(aclAgentGroup, testGroup).addProperty(aclMode, aclRead).addProperty(aclMode, aclWrite)
-				.addProperty(aclAccessTo, resource);
-
-		model.createResource(aclPrefix + "#auth3").addProperty(RDF.type, aclAuthorization)
-				.addProperty(aclAgentClass, FOAF.Agent).addProperty(aclMode, aclRead)
-				.addProperty(aclAccessTo, resource);
-
-		return model;
+		return filteredData;
 	}
 
 }
