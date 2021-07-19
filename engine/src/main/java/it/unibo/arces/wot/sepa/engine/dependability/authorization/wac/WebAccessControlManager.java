@@ -172,7 +172,7 @@ public class WebAccessControlManager {
 	}
 
 	private String getParentContainer(String id) {
-		return id.substring(0, id.lastIndexOf("/"));
+		return id.substring(0, id.lastIndexOf("/")+1);
 	}
 
 	private Model getResourceFromTriplestore(String resIdentifier) throws SEPASecurityException, IOException {
@@ -183,7 +183,7 @@ public class WebAccessControlManager {
 		
 		QueryRequest request = new QueryRequest(QueryHTTPMethod.GET,
 				"http", "localhost", 9999, "/blazegraph/sparql",
-				"SELECT {?s ?p ?o} WHERE { GRAPH <" + resIdentifier + "> {?s ?p ?o}}",
+				"SELECT ?s ?p ?o WHERE { GRAPH <" + resIdentifier + "> {?s ?p ?o}}",
 				null, null,	"JSON", 5000, 0);
 
 		SPARQL11Protocol endpoint = new SPARQL11Protocol();
@@ -266,7 +266,7 @@ public class WebAccessControlManager {
 		try {
 			aclIdentifier = this.getAuxiliaryIdentifier(id);
 			Model data = this.getResourceFromTriplestore(aclIdentifier);
-			return this.filterData(data, recurse, aclIdentifier);
+			return this.filterData(data, recurse, id);
 		} catch (RuntimeException | SEPASecurityException | IOException e) {
 			e.printStackTrace();
 		}
