@@ -106,7 +106,7 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Too many Accept headers");
 		}
 		if (!headers[0].getValue().equals("application/json")) {
-			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Content-Type must be: application/json");
+			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Accept must be: application/json");
 		}
 
 		
