@@ -214,52 +214,6 @@ public class WebAccessControlManager {
 	 * @param recurse Only used internally for recursion.
 	 */
 	private Model getAclRecursive(String id, boolean recurse) {
-//		String ACL = "http://www.w3.org/ns/auth/acl#";
-//		// String FOAF = "http://xmlns.com/foaf/0.1/";
-//		String aclPrefix = "http://localhost:3000/resource.ttl.acl";
-//
-//		Model model = ModelFactory.createDefaultModel();
-//
-//		Resource aclAuthorization = model.createResource(ACL + "Authorization");
-//		Resource aclRead = model.createResource(ACL + "Read");
-//		Resource aclWrite = model.createResource(ACL + "Write");
-//		Resource aclAppend = model.createResource(ACL + "Append");
-//		Resource aclControl = model.createResource(ACL + "Control");
-//		Property aclAgent = model.createProperty(ACL + "agent");
-//		Property aclAgentClass = model.createProperty(ACL + "agentClass");
-//		Property aclAgentGroup = model.createProperty(ACL + "agentGroup");
-//		Property aclAccessTo = model.createProperty(ACL + "accessTo");
-//		Property aclMode = model.createProperty(ACL + "mode");
-//
-//		Resource userTestAgent = model.createResource("http://localhost:3000/user_test#me");
-//		Resource testGroup = model.createResource("http://localhost:3000/test_group#test");
-//		Resource resource = model.createResource("http://localhost:3000/resource.ttl");
-//
-//		model.createResource(aclPrefix + "#auth1").addProperty(RDF.type, aclAuthorization)
-//				.addProperty(aclAgent, userTestAgent).addProperty(aclMode, aclRead).addProperty(aclMode, aclWrite)
-//				.addProperty(aclMode, aclAppend).addProperty(aclMode, aclControl).addProperty(aclAccessTo, resource);
-//
-//		model.createResource(aclPrefix + "#auth2").addProperty(RDF.type, aclAuthorization)
-//				.addProperty(aclAgentGroup, testGroup).addProperty(aclMode, aclRead).addProperty(aclMode, aclWrite)
-//				.addProperty(aclAccessTo, resource);
-//
-//		model.createResource(aclPrefix + "#auth3").addProperty(RDF.type, aclAuthorization)
-//				.addProperty(aclAgentClass, FOAF.Agent).addProperty(aclMode, aclRead)
-//				.addProperty(aclAccessTo, resource);
-//
-//		return model;
-
-		/*
-		 * 1. Use the document's own ACL resource if it exists (in which case, stop
-		 * here). 2. Otherwise, look for authorizations to inherit from the ACL of the
-		 * document's container. If those are found, stop here. 3. Failing that, check
-		 * the container's parent container to see if that has its own ACL file, and see
-		 * if there are any permissions to inherit. 4. Failing that, move up the
-		 * container hierarchy until you find a container with an existing ACL file,
-		 * which has some permissions to inherit. 5. The root container of a user's
-		 * account MUST have an ACL resource specified. (If all else fails, the search
-		 * stops there.)
-		 */
 
 		// Obtain the direct ACL document for the resource, if it exists
 		String aclIdentifier;
@@ -287,7 +241,7 @@ public class WebAccessControlManager {
 
 		Model filteredData = ModelFactory.createDefaultModel();
 
-		Resource aclIdentifier = filteredData.getResource(object);
+		Resource resIdentifier = filteredData.getResource(object);
 		Property predicate;
 		if (recurse) {
 			predicate = filteredData.getProperty(ACL + "default");
@@ -295,7 +249,7 @@ public class WebAccessControlManager {
 			predicate = filteredData.getProperty(ACL + "accessTo");
 		}
 
-		ResIterator iter = data.listResourcesWithProperty(predicate, aclIdentifier);
+		ResIterator iter = data.listResourcesWithProperty(predicate, resIdentifier);
 		while (iter.hasNext()) {
 			Resource rule = iter.next();
 			
