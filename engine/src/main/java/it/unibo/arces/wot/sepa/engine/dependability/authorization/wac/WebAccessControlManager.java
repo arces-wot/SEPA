@@ -1,6 +1,9 @@
 package it.unibo.arces.wot.sepa.engine.dependability.authorization.wac;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,7 +29,6 @@ import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
 
 public class WebAccessControlManager {
-	// TODO: implement WAC
 	// http://solid.github.io/web-access-control-spec/
 
 	/**
@@ -45,22 +47,6 @@ public class WebAccessControlManager {
 		PermissionsBean allowedModes = this.createAuthorization(credentials, acl);
 		return allowedModes;
 	}
-
-	/**
-	 * Checks if the authorization grants the agent permission to use the given
-	 * mode.
-	 * 
-	 * @param permissions  permissions that the agent is requesting
-	 * @param allowedModes permission that are granted (taken from the acl of the
-	 *                     resource)
-	 */
-//	private void checkPermissions(PermissionSet permissions, PermissionSet allowedModes) {
-//		for(String mode : permissions.getTruthyPermissions()) {
-//			if(allowedModes.getPermissions().get(mode) == false) {
-//				System.err.println("WAC error! Requested mode [" + mode + "] is not allowed.");
-//			}
-//		}
-//	}
 
 	/**
 	 * Determines the available permissions for the given credentials and acl.
@@ -124,7 +110,7 @@ public class WebAccessControlManager {
 			return true;
 		}
 
-		boolean isAuthenticated = credentials != null;
+		boolean isAuthenticated = credentials != null && !credentials.isEmpty();
 
 		if (isAuthenticated) {
 			if (acl.contains(authRule, aclAgentClass, aclAuthenticatedAgent)) {
@@ -168,11 +154,41 @@ public class WebAccessControlManager {
 	}
 
 	private boolean isRootContainer(String resIdentifier) {
-		return resIdentifier.equals("http://localhost:3000/");
+		// TODO: baseURL needs to be configurable, maybe it could be sent
+		// directly by the SOLID server inside the request body!
+		final String baseURL = this.ensureTrailingSlash("http://localhost:3000/");
+		return this.ensureTrailingSlash(resIdentifier).equals(baseURL);
 	}
 
+	private String ensureTrailingSlash(String str) {
+		// First, remove every trailing slash:
+		while (str.charAt(str.length()) == '/') {
+			str.substring(0, str.length());
+		}
+		// Then, add a single slash:
+		str += "/";
+		
+		return str;
+	}
+	
+	private URI getParentContainerFromURI(URI uri) {
+		return uri.getPath().endsWith("/") ? uri.resolve("..") : uri.resolve(".");
+	}
+	
 	private String getParentContainer(String id) {
-		return id.substring(0, id.lastIndexOf("/")+1);
+		if (this.isRootContainer(id)) {
+			return null;
+		}
+		
+		// Trailing slash is necessary for URI library
+		String uriWithTrailingSlash = this.ensureTrailingSlash(id);
+	    try {
+	    	URI uri = new URI(uriWithTrailingSlash);
+	    	return this.getParentContainerFromURI(uri).toURL().getRef();
+		} catch (URISyntaxException | MalformedURLException e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 
 	private Model getResourceFromTriplestore(String resIdentifier) throws SEPASecurityException, IOException {
@@ -190,10 +206,15 @@ public class WebAccessControlManager {
 		QueryResponse ret = (QueryResponse) endpoint.query(request);
 		endpoint.close();
 		
+		List<Bindings> bindings = ret.getBindingsResults().getBindings();
+		if (bindings.size() <= 0) {
+			return null;
+		}
+		
 		Model data = ModelFactory.createDefaultModel();
 		List<Statement> stmts = new ArrayList<>();
-		
-		for (Bindings b : ret.getBindingsResults().getBindings()) {
+
+		for (Bindings b : bindings) {
 			Resource s = data.createResource(b.getValue("s"));
 			Property p = data.createProperty(b.getValue("p"));
 			Resource o = data.createResource(b.getValue("o"));
@@ -220,20 +241,23 @@ public class WebAccessControlManager {
 		try {
 			aclIdentifier = this.getAuxiliaryIdentifier(id);
 			Model data = this.getResourceFromTriplestore(aclIdentifier);
-			return this.filterData(data, recurse, id);
+			if (data != null) {
+				return this.filterData(data, recurse, id);
+			}
 		} catch (RuntimeException | SEPASecurityException | IOException e) {
 			e.printStackTrace();
 		}
 
 		// Obtain the applicable ACL of the parent container
-		if (this.isRootContainer(id)) {
+		String parent = this.getParentContainer(id);
+		if (this.isRootContainer(id) || parent == null) {
 			// Solid, §10.1: "In the event that a server can’t apply an ACL to a resource,
 			// it MUST deny access."
 			// https://solid.github.io/specification/protocol#web-access-control
 			throw new RuntimeException("ACL file not found");
+		} else {
+			return this.getAclRecursive(parent, true);
 		}
-		String parent = this.getParentContainer(id);
-		return this.getAclRecursive(parent, true);
 	}
 
 	private Model filterData(Model data, boolean recurse, String object) {
