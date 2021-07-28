@@ -37,6 +37,7 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 	protected HTTPHandlerBeans jmx = new HTTPHandlerBeans();
 
 	protected final String wacPath;
+	protected final WebAccessControlManager wacManager = new WebAccessControlManager(); // a Singleton instance
 
 	public WebAccessControlHandler(String wacPath) throws IllegalArgumentException {
 		this.wacPath = wacPath;
@@ -77,8 +78,8 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 		}
 		
 		// URI path validation
-		if (!uri.getPath().equals(wacPath))
-			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Wrong path: " + uri.getPath() + " expecting: " + wacPath);	
+		if (!uri.getPath().equals(this.wacPath))
+			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Wrong path: " + uri.getPath() + " expecting: " + this.wacPath);	
 		
 		Header[] headers;
 		// Parsing and validating request headers
@@ -126,6 +127,14 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 		
 		Gson gson = new Gson();
 		WacRequest wacRequest = (WacRequest) gson.fromJson(requestBody, WacRequest.class);
+		
+		// Root identifier URI syntactical validation
+		try {
+			new URI(wacRequest.getRootIdentifier());
+		} catch (URISyntaxException e) {
+			logger.error(e);
+			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, "Root identifier should be a valid URI.");
+		}
 		
 		// Resource identifier URI syntactical validation
 		try {
@@ -176,8 +185,8 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 		}
 		
 		// Perform the Wac authorization algorithm
-		WebAccessControlManager wacManager = new WebAccessControlManager();
-		PermissionsBean allowedModes = wacManager.handle(wacReq.getResIdentifier(), wacReq.getWebid());
+		PermissionsBean allowedModes = this.wacManager.handle(wacReq.getRootIdentifier(),
+				wacReq.getResIdentifier(), wacReq.getWebid());
 		
 		// Convert the Java Bean into Json and send the response
 		Gson gson = new Gson();
