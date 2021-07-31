@@ -172,6 +172,81 @@ public class WebAccessControlHandler implements HttpAsyncRequestHandler<HttpRequ
 		if (!corsHandling(httpExchange))
 			return;
 
+		if (isStandaloneWAC(httpExchange))
+			standaloneWacRequest(httpExchange);
+		else solidWacRequest(httpExchange);
+	}
+
+	private void standaloneWacRequest(HttpAsyncExchange httpExchange) {
+		// TODO Auto-generated method stub
+		WacStandaloneRequest wacStandaloneReq;
+		try {
+			// Parsing SOLID Wac request
+			wacStandaloneReq = standaloneRequestParse(httpExchange);
+		} catch (WacProtocolException e) {
+			logger.error("Parsing failed: " + httpExchange.getRequest());
+			HttpUtilities.sendFailureResponse(httpExchange,
+					new ErrorResponse(e.getCode(), "WacProtocolException", "Parsing failed: " + e.getMessage()));
+			jmx.parsingFailed();
+			return;
+		}
+		//Perform the wac authorization algorithm on every used graph, then build only one PermissionsBean 
+		//object for all of them that sum up all the permissions.
+		PermissionsBean allowedModes = new PermissionsBean(true, true, true, true);
+		for (String resource : wacStandaloneReq.getResIdentifier()) {
+			PermissionsBean tempAllowedModes = this.wacManager.handle(wacStandaloneReq.getRootIdentifier(),
+					resource, wacStandaloneReq.getWebid());
+			if (!tempAllowedModes.isRead() && allowedModes.isRead())  allowedModes.setRead(false);
+			if (!tempAllowedModes.isWrite() && allowedModes.isWrite())  allowedModes.setWrite(false); 
+			if (!tempAllowedModes.isAppend() && allowedModes.isAppend())  allowedModes.setAppend(false); 
+			if (!tempAllowedModes.isControl() && allowedModes.isControl())  allowedModes.setControl(false); 
+		}
+		
+		// Convert the Java Bean into Json and send the response
+		Gson gson = new Gson();
+		String allowedModesJson = gson.toJson(allowedModes);
+		HttpUtilities.sendResponse(httpExchange, HttpStatus.SC_OK, allowedModesJson);
+		
+	}
+
+	private WacStandaloneRequest standaloneRequestParse(HttpAsyncExchange httpExchange) {
+		// TODO Auto-generated method stub
+		HttpRequest request = httpExchange.getRequest();
+		String requestUri = request.getRequestLine().getUri();
+		
+		// Request URI syntactical validation
+		URI uri;
+		try {
+			uri = new URI(requestUri);
+		} catch (URISyntaxException e) {
+			throw new WacProtocolException(HttpStatus.SC_BAD_REQUEST, e.getMessage());
+		}
+		
+		String requestBody;
+		HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+		try {
+			requestBody = EntityUtils.toString(entity, Charset.forName("UTF-8"));
+		} catch (org.apache.http.ParseException | IOException e) {
+			logger.error(e);
+			throw new WacProtocolException(HttpStatus.SC_INTERNAL_SERVER_ERROR, "Error while parsing the request body");
+		}
+		//TODO: Check if it is a query or an update
+		
+		//TODO: from the body, that will be a query, we extract all the graphs that are used
+		
+		
+		//TODO: from the headers we have to extract the bearer token and extract and validate the webid
+		
+		//TODO: build the WacStandaloneRequest object
+		return new WacStandaloneRequest();
+	}
+
+	private boolean isStandaloneWAC(HttpAsyncExchange httpExchange) {
+		// TODO Auto-generated method stub
+		return true;
+	}
+
+	private void solidWacRequest(HttpAsyncExchange httpExchange) {
 		WacRequest wacReq;
 		try {
 			// Parsing SOLID Wac request
