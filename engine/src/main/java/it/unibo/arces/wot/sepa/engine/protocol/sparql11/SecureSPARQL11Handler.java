@@ -20,15 +20,20 @@ package it.unibo.arces.wot.sepa.engine.protocol.sparql11;
 
 import org.apache.http.Header;
 import org.apache.http.HttpRequest;
+import org.apache.http.HttpStatus;
+import org.apache.http.nio.protocol.HttpAsyncExchange;
 
 import it.unibo.arces.wot.sepa.commons.exceptions.SEPASecurityException;
 import it.unibo.arces.wot.sepa.commons.security.ClientAuthorization;
 import it.unibo.arces.wot.sepa.engine.bean.SEPABeans;
 import it.unibo.arces.wot.sepa.engine.dependability.Dependability;
+import it.unibo.arces.wot.sepa.engine.dependability.authorization.wac.WebAccessControlManager;
+import it.unibo.arces.wot.sepa.engine.scheduling.InternalUQRequest;
 import it.unibo.arces.wot.sepa.engine.scheduling.Scheduler;
 
 public class SecureSPARQL11Handler extends SPARQL11Handler implements SecureSPARQL11HandlerMBean {
-
+	protected final WebAccessControlManager wacManager = new WebAccessControlManager();
+	
 	public SecureSPARQL11Handler(Scheduler scheduler,String queryPath,String updatePath) throws IllegalArgumentException {
 		super(scheduler,queryPath,updatePath);
 		
@@ -118,6 +123,39 @@ According to RFC6749, the error member can assume the following values: invalid_
 		String jwt = bearer[0].getValue().split(" ")[1];
 
 		return Dependability.validateToken(jwt);
+	}
+	
+	@Override
+	protected InternalUQRequest parse(HttpAsyncExchange exchange, ClientAuthorization auth){
+		//TODO authorize that return a webID and put it into credentials
+		String credentials = "http://TODO";
+		//TODO construct object GraphsFromQuery
+		GraphsFromQuery graphs = new GraphsFromQuery();
+		
+		if (verifyGraphWithWAC(graphs, credentials)) return super.parse(exchange, auth);
+		throw new SPARQL11ProtocolException(HttpStatus.SC_FORBIDDEN, "Access Forbidden");
+		
+	}
+
+	private boolean verifyGraphWithWAC(GraphsFromQuery graphs, String credentials) {
+		// TODO Auto-generated method stub
+		if (!graphs.getGraphsToBeRead().isEmpty()) {
+			for (String resourceId : graphs.getGraphsToBeRead()) {
+				if (!wacManager.handle(graphs.getRoodId(), resourceId, credentials).isRead()) return false;
+			}
+		}
+		if (!graphs.getGraphsToBeWritten().isEmpty()) {
+			for (String resourceId : graphs.getGraphsToBeWritten()) {
+				if (!wacManager.handle(graphs.getRoodId(), resourceId, credentials).isWrite()) return false;
+			}
+		}
+		//For deleting do we request control permissions?
+		if (!graphs.getGraphsToBeDeleted().isEmpty()) {
+			for (String resourceId : graphs.getGraphsToBeDeleted()) {
+				if (!wacManager.handle(graphs.getRoodId(), resourceId, credentials).isControl()) return false;
+			}
+		}
+		return true;
 	}
 
 	@Override
