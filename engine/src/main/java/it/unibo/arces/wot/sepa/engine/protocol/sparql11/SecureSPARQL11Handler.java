@@ -141,18 +141,18 @@ According to RFC6749, the error member can assume the following values: invalid_
 		// TODO Auto-generated method stub
 		if (!graphs.getGraphsToBeRead().isEmpty()) {
 			for (String resourceId : graphs.getGraphsToBeRead()) {
-				if (!wacManager.handle(graphs.getRoodId(), resourceId, credentials).isRead()) return false;
+				if (!wacManager.handle(graphs.getRootId(), resourceId, credentials).isRead()) return false;
 			}
 		}
 		if (!graphs.getGraphsToBeWritten().isEmpty()) {
 			for (String resourceId : graphs.getGraphsToBeWritten()) {
-				if (!wacManager.handle(graphs.getRoodId(), resourceId, credentials).isWrite()) return false;
+				if (!wacManager.handle(graphs.getRootId(), resourceId, credentials).isWrite()) return false;
 			}
 		}
 		//For deleting do we request control permissions?
 		if (!graphs.getGraphsToBeDeleted().isEmpty()) {
 			for (String resourceId : graphs.getGraphsToBeDeleted()) {
-				if (!wacManager.handle(graphs.getRoodId(), resourceId, credentials).isControl()) return false;
+				if (!wacManager.handle(graphs.getRootId(), resourceId, credentials).isControl()) return false;
 			}
 		}
 		return true;

@@ -6,7 +6,7 @@ public class GraphsFromQuery {
 	private List<String> graphsToBeRead;
 	private List<String> graphsToBeWritten;
 	private List<String> graphsToBeDeleted;
-	private String roodId;
+	private String rootId;
 	
 	public GraphsFromQuery() {
 		super();
@@ -29,11 +29,11 @@ public class GraphsFromQuery {
 	public void setGraphsToBeDeleted(List<String> graphsToBeDeleted) {
 		this.graphsToBeDeleted = graphsToBeDeleted;
 	}
-	public String getRoodId() {
-		return roodId;
+	public String getRootId() {
+		return rootId;
 	}
-	public void setRoodId(String roodId) {
-		this.roodId = roodId;
+	public void setRootId(String rootId) {
+		this.rootId = rootId;
 	}
 	
 	
