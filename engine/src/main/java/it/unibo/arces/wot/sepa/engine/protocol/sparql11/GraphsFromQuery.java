@@ -1,41 +1,75 @@
 package it.unibo.arces.wot.sepa.engine.protocol.sparql11;
 
-import java.util.List;
+import java.util.Set;
 
 public class GraphsFromQuery {
-	private List<String> graphsToBeRead;
-	private List<String> graphsToBeWritten;
-	private List<String> graphsToBeDeleted;
-	private String rootId;
+	private Set<String> graphsToRead;
+	private Set<String> graphsToWrite;
+	private Set<String> graphsToAppend;
+	private Set<String> graphsToDelete;
 	
 	public GraphsFromQuery() {
 		super();
+		this.graphsToRead = null;
+		this.graphsToWrite = null;
+		this.graphsToAppend = null;
+		this.graphsToDelete = null;
 	}
-	public List<String> getGraphsToBeRead() {
-		return graphsToBeRead;
+	public Set<String> getGraphsToRead() {
+		return graphsToRead;
 	}
-	public void setGraphsToBeRead(List<String> graphsToBeRead) {
-		this.graphsToBeRead = graphsToBeRead;
+	public void setGraphsToRead(Set<String> graphsToRead) {
+		this.graphsToRead = graphsToRead;
 	}
-	public List<String> getGraphsToBeWritten() {
-		return graphsToBeWritten;
+	public Set<String> getGraphsToWrite() {
+		return graphsToWrite;
 	}
-	public void setGraphsToBeWritten(List<String> graphsToBeWritten) {
-		this.graphsToBeWritten = graphsToBeWritten;
+	public void setGraphsToWrite(Set<String> graphsToWrite) {
+		this.graphsToWrite = graphsToWrite;
 	}
-	public List<String> getGraphsToBeDeleted() {
-		return graphsToBeDeleted;
+	public Set<String> getGraphsToAppend() {
+		return graphsToAppend;
 	}
-	public void setGraphsToBeDeleted(List<String> graphsToBeDeleted) {
-		this.graphsToBeDeleted = graphsToBeDeleted;
+	public void setGraphsToAppend(Set<String> graphsToAppend) {
+		this.graphsToAppend = graphsToAppend;
 	}
-	public String getRootId() {
-		return rootId;
+	public Set<String> getGraphsToDelete() {
+		return graphsToDelete;
 	}
-	public void setRootId(String rootId) {
-		this.rootId = rootId;
+	public void setGraphsToDelete(Set<String> graphsToDelete) {
+		this.graphsToDelete = graphsToDelete;
 	}
 	
-	
-
+	public void mergeWith(GraphsFromQuery other) {
+		if (other == null)
+			return;
+		
+		if (other.graphsToRead != null){
+			if (this.graphsToRead != null)
+				this.graphsToRead.addAll(other.graphsToRead);
+			else
+				this.setGraphsToRead(other.graphsToRead);
+		}
+		
+		if (other.graphsToWrite != null){
+			if (this.graphsToWrite != null)
+				this.graphsToWrite.addAll(other.graphsToWrite);
+			else
+				this.setGraphsToWrite(other.graphsToWrite);
+		}
+		
+		if (other.graphsToAppend != null){
+			if (this.graphsToAppend != null)
+				this.graphsToAppend.addAll(other.graphsToAppend);
+			else
+				this.setGraphsToAppend(other.graphsToAppend);
+		}
+		
+		if (other.graphsToDelete != null) {
+			if (this.graphsToDelete != null)
+				this.graphsToDelete.addAll(other.graphsToDelete);
+			else
+				this.setGraphsToDelete(other.graphsToDelete);
+		}
+	}
 }

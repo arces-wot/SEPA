@@ -24,11 +24,14 @@ import org.apache.http.HttpStatus;
 import org.apache.http.nio.protocol.HttpAsyncExchange;
 
 import it.unibo.arces.wot.sepa.commons.exceptions.SEPASecurityException;
+import it.unibo.arces.wot.sepa.commons.exceptions.SEPASparqlParsingException;
 import it.unibo.arces.wot.sepa.commons.security.ClientAuthorization;
 import it.unibo.arces.wot.sepa.engine.bean.SEPABeans;
 import it.unibo.arces.wot.sepa.engine.dependability.Dependability;
 import it.unibo.arces.wot.sepa.engine.dependability.authorization.wac.WebAccessControlManager;
+import it.unibo.arces.wot.sepa.engine.scheduling.InternalQueryRequest;
 import it.unibo.arces.wot.sepa.engine.scheduling.InternalUQRequest;
+import it.unibo.arces.wot.sepa.engine.scheduling.InternalUpdateRequest;
 import it.unibo.arces.wot.sepa.engine.scheduling.Scheduler;
 
 public class SecureSPARQL11Handler extends SPARQL11Handler implements SecureSPARQL11HandlerMBean {
@@ -127,10 +130,23 @@ According to RFC6749, the error member can assume the following values: invalid_
 	
 	@Override
 	protected InternalUQRequest parse(HttpAsyncExchange exchange, ClientAuthorization auth){
+		InternalUQRequest req = super.parse(exchange, auth);
+		
+		GraphsFromQuery graphs = new GraphsFromQuery();
+		try {
+			if (req.isQueryRequest()) {
+				graphs.mergeWith(GraphsExtractor.getQueryGraphs((InternalQueryRequest) req));
+			} else if (req.isUpdateRequest()) {
+				graphs.mergeWith(GraphsExtractor.getUpdateGraphs((InternalUpdateRequest) req));
+			}
+		} catch (SEPASparqlParsingException e) {
+			throw new SPARQL11ProtocolException(HttpStatus.SC_BAD_REQUEST, e.getMessage());
+		}
+		
 		//TODO authorize that return a webID and put it into credentials
 		String credentials = "http://TODO";
 		//TODO construct object GraphsFromQuery
-		GraphsFromQuery graphs = new GraphsFromQuery();
+		
 		
 		if (verifyGraphWithWAC(graphs, credentials)) return super.parse(exchange, auth);
 		throw new SPARQL11ProtocolException(HttpStatus.SC_FORBIDDEN, "Access Forbidden");
@@ -138,21 +154,27 @@ According to RFC6749, the error member can assume the following values: invalid_
 	}
 
 	private boolean verifyGraphWithWAC(GraphsFromQuery graphs, String credentials) {
-		// TODO Auto-generated method stub
-		if (!graphs.getGraphsToBeRead().isEmpty()) {
-			for (String resourceId : graphs.getGraphsToBeRead()) {
-				if (!wacManager.handle(graphs.getRootId(), resourceId, credentials).isRead()) return false;
+		String rootId = "http://localhost:8000/secure/sparql";
+		
+		if (!graphs.getGraphsToRead().isEmpty()) {
+			for (String resourceId : graphs.getGraphsToRead()) {
+				if (!wacManager.handle(rootId, resourceId, credentials).isRead()) return false;
 			}
 		}
-		if (!graphs.getGraphsToBeWritten().isEmpty()) {
-			for (String resourceId : graphs.getGraphsToBeWritten()) {
-				if (!wacManager.handle(graphs.getRootId(), resourceId, credentials).isWrite()) return false;
+		if (!graphs.getGraphsToWrite().isEmpty()) {
+			for (String resourceId : graphs.getGraphsToWrite()) {
+				if (!wacManager.handle(rootId, resourceId, credentials).isWrite()) return false;
+			}
+		}
+		if (!graphs.getGraphsToAppend().isEmpty()) {
+			for (String resourceId : graphs.getGraphsToAppend()) {
+				if (!wacManager.handle(rootId, resourceId, credentials).isAppend()) return false;
 			}
 		}
 		//For deleting do we request control permissions?
-		if (!graphs.getGraphsToBeDeleted().isEmpty()) {
-			for (String resourceId : graphs.getGraphsToBeDeleted()) {
-				if (!wacManager.handle(graphs.getRootId(), resourceId, credentials).isControl()) return false;
+		if (!graphs.getGraphsToDelete().isEmpty()) {
+			for (String resourceId : graphs.getGraphsToDelete()) {
+				if (!wacManager.handle(rootId, resourceId, credentials).isControl()) return false;
 			}
 		}
 		return true;
