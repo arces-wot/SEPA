@@ -144,35 +144,35 @@ According to RFC6749, the error member can assume the following values: invalid_
 		}
 		
 		//TODO authorize that return a webID and put it into credentials
-		String credentials = "http://TODO";
+		String credentials = "http://localhost:3000/sepa_test#me";
 		//TODO construct object GraphsFromQuery
 		
 		
-		if (verifyGraphWithWAC(graphs, credentials)) return super.parse(exchange, auth);
+		if (verifyGraphWithWAC(graphs, credentials)) return req;
 		throw new SPARQL11ProtocolException(HttpStatus.SC_FORBIDDEN, "Access Forbidden");
 		
 	}
 
 	private boolean verifyGraphWithWAC(GraphsFromQuery graphs, String credentials) {
-		String rootId = "http://localhost:8000/secure/sparql";
+		String rootId = "http://localhost:3000";
 		
-		if (!graphs.getGraphsToRead().isEmpty()) {
+		if (graphs.getGraphsToRead()!=null && !graphs.getGraphsToRead().isEmpty()) {
 			for (String resourceId : graphs.getGraphsToRead()) {
 				if (!wacManager.handle(rootId, resourceId, credentials).isRead()) return false;
 			}
 		}
-		if (!graphs.getGraphsToWrite().isEmpty()) {
+		if (graphs.getGraphsToWrite()!=null && !graphs.getGraphsToWrite().isEmpty()) {
 			for (String resourceId : graphs.getGraphsToWrite()) {
 				if (!wacManager.handle(rootId, resourceId, credentials).isWrite()) return false;
 			}
 		}
-		if (!graphs.getGraphsToAppend().isEmpty()) {
+		if (graphs.getGraphsToAppend()!=null &&!graphs.getGraphsToAppend().isEmpty()) {
 			for (String resourceId : graphs.getGraphsToAppend()) {
 				if (!wacManager.handle(rootId, resourceId, credentials).isAppend()) return false;
 			}
 		}
 		//For deleting do we request control permissions?
-		if (!graphs.getGraphsToDelete().isEmpty()) {
+		if (graphs.getGraphsToDelete()!=null &&!graphs.getGraphsToDelete().isEmpty()) {
 			for (String resourceId : graphs.getGraphsToDelete()) {
 				if (!wacManager.handle(rootId, resourceId, credentials).isControl()) return false;
 			}
