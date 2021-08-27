@@ -43,9 +43,8 @@ public abstract class InternalUQRequest extends InternalRequest {
 	protected Set<String> namedGraphUri = new HashSet<String>();
 	protected Set<String> rdfDataSet = new HashSet<String>();
 	
-	public InternalUQRequest(String sparql,Set<String> defaultGraphUri,Set<String> namedGraphUri,ClientAuthorization auth) throws SEPASparqlParsingException {
-		super(auth);
-		
+	public InternalUQRequest(String sparql,Set<String> defaultGraphUri,Set<String> namedGraphUri) throws SEPASparqlParsingException {
+		super();
 		if (sparql == null) throw new IllegalArgumentException("SPARQL is null");
 		
 		this.sparql = evaluateFunctions(sparql);

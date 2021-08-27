@@ -26,14 +26,13 @@ import it.unibo.arces.wot.sepa.commons.security.ClientAuthorization;
 public class InternalQueryRequest extends InternalUQRequest {
 	private String internetMediaType = "application/sparql-results+json";
 
-	public InternalQueryRequest(String sparql, Set<String> defaultGraphUri, Set<String> namedGraphUri,
-			ClientAuthorization auth) throws SEPASparqlParsingException {
-		super(sparql, defaultGraphUri, namedGraphUri, auth);
+	public InternalQueryRequest(String sparql, Set<String> defaultGraphUri, Set<String> namedGraphUri) throws SEPASparqlParsingException {
+		super(sparql, defaultGraphUri, namedGraphUri);
 	}
 
 	public InternalQueryRequest(String sparql, Set<String> defaultGraphUri, Set<String> namedGraphUri,
 			ClientAuthorization auth, String mediaType) throws SEPASparqlParsingException {
-		this(sparql, defaultGraphUri, namedGraphUri, auth);
+		this(sparql, defaultGraphUri, namedGraphUri);
 
 		internetMediaType = mediaType;
 	}

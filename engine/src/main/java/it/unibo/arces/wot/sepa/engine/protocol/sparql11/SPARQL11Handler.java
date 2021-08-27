@@ -168,7 +168,7 @@ public class SPARQL11Handler implements HttpAsyncRequestHandler<HttpRequest>, SP
 
 				Header[] headers = exchange.getRequest().getHeaders("Accept");
 				if (headers.length != 1)
-					return new InternalQueryRequest(sparql, graphUri, namedGraphUri, auth);
+					return new InternalQueryRequest(sparql, graphUri, namedGraphUri);
 				else
 					return new InternalQueryRequest(sparql, graphUri, namedGraphUri, auth, headers[0].getValue());
 			} catch (SEPASparqlParsingException | UnsupportedEncodingException e) {
@@ -245,7 +245,7 @@ public class SPARQL11Handler implements HttpAsyncRequestHandler<HttpRequest>, SP
 						headers = exchange.getRequest().getHeaders("Accept");
 						if (headers.length != 1)
 							try {
-								return new InternalQueryRequest(sparql, default_graph_uri, named_graph_uri, auth);
+								return new InternalQueryRequest(sparql, default_graph_uri, named_graph_uri);
 							} catch (SEPASparqlParsingException e) {
 								throw new SPARQL11ProtocolException(HttpStatus.SC_BAD_REQUEST,e.getMessage());
 							}
@@ -303,7 +303,7 @@ public class SPARQL11Handler implements HttpAsyncRequestHandler<HttpRequest>, SP
 				headers = exchange.getRequest().getHeaders("Accept");
 				if (headers.length != 1)
 					try {
-						return new InternalQueryRequest(sparql, default_graph_uri, named_graph_uri, auth);
+						return new InternalQueryRequest(sparql, default_graph_uri, named_graph_uri);
 					} catch (SEPASparqlParsingException e) {
 						throw new SPARQL11ProtocolException(HttpStatus.SC_BAD_REQUEST,e.getMessage());
 					}
@@ -525,13 +525,6 @@ public class SPARQL11Handler implements HttpAsyncRequestHandler<HttpRequest>, SP
 		} catch (SEPASecurityException e1) {
 			HttpUtilities.sendFailureResponse(httpExchange,
 					new ErrorResponse(HttpStatus.SC_UNAUTHORIZED, "oauth_exception", e1.getMessage()));
-			jmx.authorizingFailed();
-			return;
-		}
-		if (!oauth.isAuthorized()) {
-			logger.log(Level.getLevel("oauth"),"*** NOT AUTHORIZED *** " + oauth.getDescription());
-			HttpUtilities.sendFailureResponse(httpExchange,
-					new ErrorResponse(HttpStatus.SC_UNAUTHORIZED, oauth.getError(), oauth.getDescription()));
 			jmx.authorizingFailed();
 			return;
 		}

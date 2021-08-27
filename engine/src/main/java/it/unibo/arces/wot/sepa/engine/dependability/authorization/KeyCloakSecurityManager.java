@@ -23,20 +23,9 @@ import it.unibo.arces.wot.sepa.engine.dependability.authorization.identities.Dig
 
 public class KeyCloakSecurityManager extends SecurityManager {
 
-	private SyncLdap ldap;
-	private VirtuosoIsql isql;
-
-	public KeyCloakSecurityManager(SSLContext ssl, RSAKey key,LdapProperties prop, IsqlProperties isqlprop)
+	public KeyCloakSecurityManager(SSLContext ssl, RSAKey key)
 			throws SEPASecurityException {
 		super(ssl, key, false);
-
-		ldap = new SyncLdap(prop);
-
-		isql = new VirtuosoIsql(isqlprop,ldap.getEndpointUsersPassword());
-
-		new UsersSync(ldap, isql);
-		
-		logger.log(Level.getLevel("oauth"),"EndpointUsersPassword: "+ldap.getEndpointUsersPassword());
 	}
 	
 	@Override
@@ -132,17 +121,8 @@ public class KeyCloakSecurityManager extends SecurityManager {
 			return new ClientAuthorization("invalid_grant",
 					"Token can not be used before: " + claimsSet.getNotBeforeTime());
 		}
-		
-		Credentials cred = null;
-		try {
-			cred = getEndpointCredentials(uid);
-			logger.log(Level.getLevel("oauth"),"Endpoint credentials: "+cred);
-		} catch (SEPASecurityException e) {
-			logger.log(Level.getLevel("oauth"),"Failed to retrieve credentials (" + uid + ")");
-			return new ClientAuthorization("invalid_grant", "Failed to get credentials (" + uid + ")");
-		}
 
-		return new ClientAuthorization(cred);
+		return new ClientAuthorization(new Credentials(uid, uid));
 	}
 
 	@Override
@@ -197,11 +177,6 @@ public class KeyCloakSecurityManager extends SecurityManager {
 	public boolean checkCredentials(String uid, String secret) throws SEPASecurityException {
 		// TODO Auto-generated method stub
 		return false;
-	}
-
-	@Override
-	public Credentials getEndpointCredentials(String uid) throws SEPASecurityException {
-		return new Credentials(uid, ldap.getEndpointUsersPassword());
 	}
 
 	@Override
@@ -304,6 +279,12 @@ public class KeyCloakSecurityManager extends SecurityManager {
 	public void setIssuer(String is) throws SEPASecurityException {
 		// TODO Auto-generated method stub
 		
+	}
+
+	@Override
+	public Credentials getEndpointCredentials(String uid) throws SEPASecurityException {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }

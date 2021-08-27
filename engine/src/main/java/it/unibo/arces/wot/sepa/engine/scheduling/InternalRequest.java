@@ -24,8 +24,7 @@ public abstract class InternalRequest {
 	private ClientAuthorization auth;
 
 	
-	public InternalRequest(ClientAuthorization auth) {
-		this.auth = auth;
+	public InternalRequest() {
 	}
 	
 	public boolean isQueryRequest() {

@@ -26,6 +26,7 @@ import org.apache.http.nio.protocol.HttpAsyncExchange;
 import it.unibo.arces.wot.sepa.commons.exceptions.SEPASecurityException;
 import it.unibo.arces.wot.sepa.commons.exceptions.SEPASparqlParsingException;
 import it.unibo.arces.wot.sepa.commons.security.ClientAuthorization;
+import it.unibo.arces.wot.sepa.commons.security.Credentials;
 import it.unibo.arces.wot.sepa.engine.bean.SEPABeans;
 import it.unibo.arces.wot.sepa.engine.dependability.Dependability;
 import it.unibo.arces.wot.sepa.engine.dependability.authorization.wac.WebAccessControlManager;
